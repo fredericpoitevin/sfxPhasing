@@ -261,7 +261,8 @@ for i in range(5):     #set to 5 for testing/debug purposes
 #for i in range(len(directory_list)):
     print(len(directory_list))
     start_time = datetime.datetime.now()
-    os.system('mkdir -p '+directory_list[i])
+    os.system('mkdir -p -m777 '+directory_list[i])
+    #os.system('mkdir -p '+directory_list[i])
     # removing redundant copy operations
     #os.system('cp Se_SAD_automation.py SHELX_script.py crank2_script.py autobuild.py '+sequenceFile+' '+reflectionFile+' '+directory_list[i])  
     #os.system('cp Se_SAD_automation.py SHELX_script.py crank2_script.py autobuild.py '+directory_list[i])  
@@ -278,17 +279,19 @@ for i in range(5):     #set to 5 for testing/debug purposes
     #process = subprocess.Popen(command_list[i], stdout = subprocess.PIPE, stderr = subprocess.PIPE, shell= True)
     #process = subprocess.Popen('srun --cores-per-socket '+coreNumber+' -o %J.log '+command_list[i], stdout = subprocess.PIPE, stderr = subprocess.PIPE, shell = True)
     ########run shifter with affinity settings
-    process = subprocess.Popen('export OMP_NUM_PROCESS=32; export OMP_PROC_BIND=spread; srun -N 1 -o %J.log shifter /img/load_everything.sh '+command_list[i], stdout = subprocess.PIPE, stderr = subprocess.PIPE, shell = True)
+    process = subprocess.Popen('export OMP_NUM_PROCESS=32; export OMP_PROC_BIND=spread; srun -n 1 -o %J.log shifter /img/load_everything.sh '+command_list[i], stdout = subprocess.PIPE, stderr = subprocess.PIPE, shell = True)
+    #process = subprocess.Popen('export OMP_NUM_PROCESS=32; export OMP_PROC_BIND=spread; srun -N 1 -o %J.log shifter /img/load_everything.sh '+command_list[i], stdout = subprocess.PIPE, stderr = subprocess.PIPE, shell = True)
     #d = dict(os.environ)
     #d['OMP_NUM_PROCESS'] = '32'
     #d['OMP_PROC_BIND'] = 'spread'
     #process = subprocess.Popen('srun -n 1 -o %J.log shifter /img/load_everything.sh '+command_list[i],env = d, stdout = subprocess.PIPE, stderr = subprocess.PIPE, shell = True)
     print('Job submitted')
     ## only uncomment this for debug otherwise job submission will block
-    out,err = process.communicate()
+    #out,err = process.communicate()
     #print(out)
     #process
-    print(err)
+    #print(err)
+    ##########
     os.chdir(original_path)    
 end_time_cp = datetime.datetime.now()
 delta = end_time_cp - start_time_cp
