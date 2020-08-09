@@ -7,6 +7,7 @@ from __future__ import print_function
 import sys
 import subprocess
 import os
+import time
 import datetime
 import argparse
 import re
@@ -27,7 +28,8 @@ parser= argparse.ArgumentParser()
 parser.add_argument("-rfl","--reflection-mtz", help="input the mtz file of reflection", type = str)
 parser.add_argument("-seq","--sequence-file",help = "input the sequence file", type = str)
 parser.add_argument("-SFAC","--atom-type", help = "input the name of atom of this SAD (case insensitive)" , type = str)
-parser.add_argument("-q", "--queue", help = "input the computing queue you want to use", type = str)
+#removing the queue arg because is passed from sbatch submission script
+#parser.add_argument("-q", "--queue", help = "input the computing queue you want to use", type = str)
 parser.add_argument("-n", "--number-of-cores", help = "input the number of core you want to use", type = str)
 parser.add_argument("-na", "--number-of-atoms", help = "input number of heavy anomalous scatterers", type = int)
 parser.add_argument("-DSUL_R","--disulfide-range", nargs = '+', help='input the range of the disulfide range (optional)',type = str)
@@ -62,11 +64,11 @@ else:
     print('Please input the scattering atoms')
     sys.exit()
 
-if args.queue:
-    computeQueue = args.queue
-else:
-    print ('Please input the computing queue you want to use')
-    sys.exit()
+#if args.queue:
+#    computeQueue = args.queue
+#else:
+#    print ('Please input the computing queue you want to use')
+#    sys.exit()
     
 if args.number_of_cores:
     coreNumber = args.number_of_cores
@@ -76,10 +78,10 @@ else:
 
 if args.shifter:
     print('You have chosen to use shifter to run Se_SAD part')
-    command_prefix = 'srun -N 1 shifter /img/load_everything.sh'
+    command_prefix = 'srun -n 1 shifter /img/load_everything.sh'
 else:
     print('You have chosen to run using a conda env')
-    command_prefix = 'srun -N 1'
+    command_prefix = 'srun -n 1'
 ###################### Setup the Grid Range #########################
 
 print("This program utilize two softwares, CCP4i2 SHELXC/D and Crank2. Further refinement can be done by initiating Autobuild")
@@ -278,20 +280,19 @@ for i in range(5):     #set to 5 for testing/debug purposes
     f = open('output.log', 'w') 
     #process = subprocess.Popen(command_list[i], stdout = subprocess.PIPE, stderr = subprocess.PIPE, shell= True)
     #process = subprocess.Popen('srun --cores-per-socket '+coreNumber+' -o %J.log '+command_list[i], stdout = subprocess.PIPE, stderr = subprocess.PIPE, shell = True)
-    ########run shifter with affinity settings
-    process = subprocess.Popen('export OMP_NUM_PROCESS=32; export OMP_PROC_BIND=spread; srun -n 1 -o %J.log shifter /img/load_everything.sh '+command_list[i], stdout = subprocess.PIPE, stderr = subprocess.PIPE, shell = True)
-    #process = subprocess.Popen('export OMP_NUM_PROCESS=32; export OMP_PROC_BIND=spread; srun -N 1 -o %J.log shifter /img/load_everything.sh '+command_list[i], stdout = subprocess.PIPE, stderr = subprocess.PIPE, shell = True)
+    ########run shifter with memory per job plus craynetwork settings so multiple jobs can ran on the same node
+    process = subprocess.Popen('srun -n 1 --mem=10000 --gres=craynetwork:0 --cpus-per-task='+coreNumber+' -o %J.log shifter /img/load_everything.sh '+command_list[i] , stdout = subprocess.PIPE, stderr = subprocess.PIPE, shell = True)
+    #introducing some waiting time between job submissions
+    time.sleep (5)
     #d = dict(os.environ)
-    #d['OMP_NUM_PROCESS'] = '32'
-    #d['OMP_PROC_BIND'] = 'spread'
     #process = subprocess.Popen('srun -n 1 -o %J.log shifter /img/load_everything.sh '+command_list[i],env = d, stdout = subprocess.PIPE, stderr = subprocess.PIPE, shell = True)
     print('Job submitted')
+
     ## only uncomment this for debug otherwise job submission will block
     #out,err = process.communicate()
     #print(out)
     #process
     #print(err)
-    ##########
     os.chdir(original_path)    
 end_time_cp = datetime.datetime.now()
 delta = end_time_cp - start_time_cp

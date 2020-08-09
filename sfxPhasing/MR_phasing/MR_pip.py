@@ -288,7 +288,8 @@ process = subprocess.Popen('phenix.mtz.dump '+my_temp['hklin'],
                            stderr=subprocess.PIPE,shell=True)
 
 out,err = process.communicate()
-
+print(out)
+print(err)
 split_out=out.splitlines()
 
 mylist = []
@@ -345,23 +346,25 @@ for i in my_temp:
 
 
 ####################################### DEPLOY PHENIX COMMAND LINE#############################################
-#process = subprocess.Popen('phaser.MRage --verbosity=VERBOSE output.eff', 
-#                         stdout=subprocess.PIPE,
-#                          stderr=subprocess.PIPE,shell=True)
+process = subprocess.Popen(' phaser.MRage --verbosity=VERBOSE output.eff', 
+                         stdout=subprocess.PIPE,
+                          stderr=subprocess.PIPE,shell=True)
 
-os.system('phaser.MRage --verbosity=VERBOSE output.eff')
-
-#out,err = process.communicate()
-
-#split_out=out.splitlines()
-
-#for i in range(len(split_out)):
-#     print(split_out[i].decode("utf-8"))
+#os.system('phaser.MRage --verbosity=VERBOSE output.eff')
+#redirecting phaser output to file 
+out,err = process.communicate()
+print(out)
+print(err)
+split_out=out.splitlines()
+with open('test.txt', 'w') as f:
+    for i in range(len(split_out)):
+     f.write(split_out[i].decode("utf-8")+'\n')
 ####################################################################################################################
 
 #######################Output result to the root directory#########################################
 for item in os.listdir(os.getcwd()):
-    if '.log' in item:
+    #if '.log' in item:
+    if '.txt' in item:
         logFile = item
 
 mylog = []
@@ -369,16 +372,18 @@ mylog = []
 with open(logFile) as f:
     for lines in f:
         mylog.append(lines)
-        
-print(logFile)
 print('CHECK'+mylog[0])
+print(len(mylog))
 try:
+    print('Here I am')
     resultTitle_index = mylog.index('Evaluation for probability of solution being correct:\n')
+    print(resultTitle_index)
 except:
     print ('The case is not successful')
 
 for line in mylog:
     if 'P(total)=' in line:
+        print(line)
         end_of_result = mylog.index(line)
 
 result = []

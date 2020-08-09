@@ -5,7 +5,7 @@ LABEL maintainer="Anna Giannakou <agiannakou@lbl.gov>"
 
 ENV DEBIAN_FRONTEND noninteractive
 ENV LANG C.UTF-8
-ARG nersc_user
+ARG exp_id
 RUN \
     apt-get update          &&                                                 \
     apt-get --yes upgrade   &&                                                 \
@@ -78,10 +78,12 @@ COPY sfxPhasing /sfx/sfxPhasing
 
 RUN cd /sfx/sfxPhasing/ && \
     bash -c "source /img/conda.local/env.sh && conda create --name sfx --file requirements.txt"
-RUN mkdir -p /img/tmp/$nersc_user
-RUN  sed -i 's|/tmp/|/img/tmp/|g' img/ccp4/ccp4-7.0/bin/ccp4.setup-sh
+RUN  sed -i "s|/tmp/|/project/projectdirs/lcls/exp/cxi/$exp_id/tmp/|g" img/ccp4/ccp4-7.0/bin/ccp4.setup-sh
+RUN cat img/ccp4/ccp4-7.0/bin/ccp4.setup-sh
 RUN  sed -i 's|/project/projectdirs/m3506/ccp4-7.0/share/ccp4i2/pipelines/crank2/crank2/crank2.py|/img/ccp4/ccp4-7.0/share/ccp4i2/pipelines/crank2/crank2/crank2.py|g' /sfx/sfxPhasing/sfxPhasing/SAD_Phasing/crank2_script.py
 ADD load_everything.sh /img
+
 WORKDIR /img
-RUN chmod +x load_everything.sh 
-#ENTRYPOINT ["./load_everything.sh"] 
+RUN chmod +x load_everything.sh
+RUN ls -lah 
+ENTRYPOINT ["./load_everything.sh"] 

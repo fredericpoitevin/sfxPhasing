@@ -26,7 +26,7 @@ parser.add_argument("-q", "--queue", help = "input the computing queue you want 
 parser.add_argument("-n", "--number-of-cores", help = "input the number of core you want to use", type = str)
 parser.add_argument("-res","--resolution_range", nargs = '+', help='input the range of the resolution range (optional)',type = str)
 parser.add_argument("-rmsd","--rmsd_range", nargs = '+', help='input the range of the rmsd range. Default: 0.5 2.0 (optional)',type = str)
-
+parser.add_argument("-shf", "--shifter", help = 'set this if you want to use shifter', type = str)
 
 args = parser.parse_args()
 
@@ -48,11 +48,11 @@ else:
     print('The sequence file is missing')
     sys.exit()
     
-if args.queue:
-    computeQueue = args.queue
-else:
-    print ('Please input the computing queue you want to use')
-    sys.exit()
+#if args.queue:
+#    computeQueue = args.queue
+#else:
+#    print ('Please input the computing queue you want to use')
+#    sys.exit()
     
 if args.number_of_cores:
     coreNumber = args.number_of_cores
@@ -70,6 +70,13 @@ if args.rmsd_range:
 else:
     rmsd_low = str(0.5)
     rmsd_high = str(2.0)
+
+if args.shifter:
+    print('You have chosen to use shifter to run Se_SAD part')
+    command_prefix = 'srun -n 1 shifter /img/load_everything.sh'
+else:
+    print('You have chosen to run using a conda env')
+    command_prefix = 'srun -n 1'
 
 ##Creating the user-defined range if any
 def get_range(x,y):
@@ -98,22 +105,28 @@ with open('FILE_SETUP.json', 'w') as outfile:
 
 # Using phenix.mtz.dump to read the reflection file 
 print('Creating resolution scanning range ..........')
-process = subprocess.Popen('phenix.mtz.dump '+rfl_file, 
+process = subprocess.Popen(command_prefix + ' phenix.mtz.dump '+rfl_file, 
                           stdout=subprocess.PIPE,
                            stderr=subprocess.PIPE,shell=True)
 
 out,err = process.communicate()
-
+print(out)
+print(err)
 split_out=out.splitlines()
-
+print(split_out)
 for line in split_out:
+    print(line)
     if 'Resolution range' in line.decode("utf-8"):
+        print('Found it')
+        print(line.decode('utf-8'))
         resolution = round(float(line.decode("utf-8").split(' ')[-1]),1)
-
+        print('Here is your resolution')
+        print(resolution)
 # Create the grid of resolution
 if args.resolution_range:
     resolution_range = get_range(round(float(args.resolution_range[0]),1),round(float(args.resolution_range[1]),1))
 else:
+    resolution_range = []
     for i in np.arange(resolution, resolution+1.5, 0.1):
         resolution_range.append(round(i,1))
 
@@ -138,13 +151,16 @@ with open('FILE_SETUP.json') as json_file:
 
 print("Creating guessed copy grid ...........")
 asu_copy_dict = {}
+print('Here is the length of the copy list')
+print(len(pdb_list))
 for i in range(len(pdb_list)):
-    process = subprocess.Popen('phenix.xtriage '+rfl_file+' '+ seq_list[i], 
+    process = subprocess.Popen(command_prefix + ' phenix.xtriage '+rfl_file+' '+ seq_list[i], 
                               stdout=subprocess.PIPE,
                                stderr=subprocess.PIPE,shell=True)
 
     out,err = process.communicate()
-
+    print(out)
+    print(err)
     split_out=out.splitlines()
     my_list=[]
     for j in range(len(split_out)):
@@ -189,7 +205,13 @@ if component_num == 1:
                 os.system('mkdir -p '+directory)
                 os.system('cp MR_pip.py'+' '+rfl_file+' '+pdb_list[0]+' '+seq_list[0]+' '+'FILE_SETUP.json'+' '+directory)
                 os.chdir("./"+directory)
-                os.system('bsub -q '+computeQueue+' -n '+coreNumber+' -o %J.log python MR_pip.py -rfl '+rfl_file+' -pdbE1 '+pdb_list[0]+' -seq1 '+seq_list[0]+' -idenE1 '+str(j)+' -errtE1 rmsd -c '+str(i)+' -res '+str(k)+' -labin '+data_labels+' -P '+original_path+' -cpus '+coreNumber)
+
+                process = subprocess.Popen('srun -n 1 --mem=5000 --gres=craynetwork:0 --cpus-per-task='+coreNumber+' -o %J.log shifter /img/load_everything.sh python MR_pip.py -rfl '+rfl_file+' -pdbE1 '+pdb_list[0]+' -seq1 '+seq_list[0]+' -idenE1 '+str(j)+' -errtE1 rmsd -c '+str(i)+' -res '+str(k)+' -labin '+data_labels+' -P '+original_path , stdout = subprocess.PIPE, stderr = subprocess.PIPE, shell = True)
+                #comment these lines out if you want parallel job execution
+                out, err = process.communicate()
+                print(out)
+                print(err)
+                #os.system('bsub -q '+computeQueue+' -n '+coreNumber+' -o %J.log python MR_pip.py -rfl '+rfl_file+' -pdbE1 '+pdb_list[0]+' -seq1 '+seq_list[0]+' -idenE1 '+str(j)+' -errtE1 rmsd -c '+str(i)+' -res '+str(k)+' -labin '+data_labels+' -P '+original_path+' -cpus '+coreNumber)
                 os.chdir("../../..")
 
     
@@ -213,14 +235,18 @@ elif component_num > 1:
         print("creating file"+str(i))
         for j in range(len(rmsd_permutation)):
             for k in resolution_range:
+                print(resolution_range)
                 directory = 'Request_'+str(i)+'_copy/'+folder_list[j]+'/resolution'+str(k)
                 
                 os.system('mkdir -p '+directory)
                 
                 cl = ''
                 for t in range(1,component_num+1):
-                    os.system('cp MR_pip.py'+' '+rfl_file+' '+pdb_list[t-1]+' '+seq_list[t-1]+' '+'FILE_SETUP.json '+' '+directory)
-                    
+                    #os.system('cp MR_pip.py'+' '+rfl_file+' '+pdb_list[t-1]+' '+seq_list[t-1]+' '+'FILE_SETUP.json '+' '+directory)
+                    process = subprocess.Popen('cp MR_pip.py'+' '+rfl_file+' '+pdb_list[t-1]+' '+seq_list[t-1]+' '+'FILE_SETUP.json '+' '+directory)
+                    out,err = process.communicate()
+                    print(out)
+                    print(err)
                     cl += '-pdbE'+str(t)+' '+pdb_list[t-1]+' '+'-seq'+str(t)+ \
                     ' '+seq_list[t-1]+' '+'-idenE'+str(t)+' '+str(rmsd_permutation[j][t-1])+ \
                     ' '+'-errtE'+str(t)+' rmsd '  
@@ -228,5 +254,11 @@ elif component_num > 1:
                 f = open("output.txt", "a")
 
                 #print(cl+' -c '+str(i)+' -res '+str(k)+' -labin '+data_labels)
-                os.system('bsub -q '+computeQueue+' -n '+coreNumber+' -o %J.log python MR_pip.py -rfl '+rfl_file+' '+cl+' -c '+str(i)+' -res '+str(k)+' -labin '+data_labels+' -P '+original_path+' -cpus '+coreNumber)
+                print(cl)
+                process = Popen('srun -n 1 --mem=5000 --gres=craynetwork:0 --cpus-per-task='+coreNumber+ '-o %J.log shifter /img/load_everything.sh python MR_pip.py -rfl ' +rfl_file+' '+cl+' -c '+str(i)+' -res '+str(k)+' -labin '+data_labels+' -P '+original_path)
+                #comment these lines out if you want parallel job execution
+                out,err = process.communicate()
+                print(out)
+                print(err)
+                #os.system('bsub -q '+computeQueue+' -n '+coreNumber+' -o %J.log python MR_pip.py -rfl '+rfl_file+' '+cl+' -c '+str(i)+' -res '+str(k)+' -labin '+data_labels+' -P '+original_path+' -cpus '+coreNumber)
                 os.chdir("../../..")
